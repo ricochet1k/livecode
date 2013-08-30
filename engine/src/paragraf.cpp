@@ -115,6 +115,7 @@ MCParagraph::MCParagraph()
 	opened = 0;
 	startindex = endindex = originalindex = MAXUINT2;
 	state = 0;
+	needs_layout = True;
 
 	// MW-2012-01-25: [[ ParaStyles ]] All attributes are unset to begin with.
 	attrs = nil;
@@ -155,6 +156,7 @@ MCParagraph::MCParagraph(const MCParagraph &pref) : MCDLlist(pref)
 	startindex = endindex = originalindex = MAXUINT2;
 	opened = 0;
 	state = 0;
+	needs_layout = True; // is this needed?
 }
 
 MCParagraph::~MCParagraph()
@@ -272,6 +274,8 @@ IO_stat MCParagraph::load(IO_handle stream, const char *version, bool is_ext)
 			return IO_NORMAL;
 		}
 	}
+
+	needs_layout = True;
 
 	return IO_NORMAL;
 }
@@ -415,6 +419,8 @@ bool MCParagraph::recomputefonts(MCFontRef p_parent_font)
 	}
 	while(t_block != blocks);
 
+	if (t_changed)
+		needs_layout = True;
 	return t_changed;
 }
 
@@ -461,6 +467,8 @@ void MCParagraph::deletelines()
 		MCLine *lptr = lines->remove(lines);
 		delete lptr;
 	}
+	
+	needs_layout = True;
 }
 
 // **** mutate blocks
@@ -473,6 +481,7 @@ void MCParagraph::deleteblocks()
 	}
 
 	state |= PS_LINES_NOT_SYNCHED;
+	needs_layout = True;
 }
 
 //clear blocks with the same attributes
@@ -513,6 +522,7 @@ void MCParagraph::defrag()
 	if (t_blocks_changed)
 	{
 		state |= PS_LINES_NOT_SYNCHED;
+		needs_layout = True;
 	}
 }
 
@@ -520,10 +530,15 @@ void MCParagraph::defrag()
 //   on the setting of 'dontWrap'.
 void MCParagraph::layout()
 {
+	if (!needs_layout)
+		return;
+
 	if (getdontwrap())
 		noflow();
 	else
 		flow();
+
+	needs_layout = False;
 }
 
 //reflow paragraph with wrapping
@@ -1330,6 +1345,7 @@ void MCParagraph::setatts(uint2 si, uint2 ei, Properties p, void *value, bool p_
 	if (t_blocks_changed)
 	{
 		state |= PS_LINES_NOT_SYNCHED;
+		needs_layout = True;
 	}
 }
 
@@ -1514,6 +1530,7 @@ void MCParagraph::join()
 	delete pgptr;
 	clearzeros();
 	deletelines();
+	needs_layout = True;
 }
 
 void MCParagraph::split() //split paragraphs on return
@@ -1567,6 +1584,7 @@ void MCParagraph::split() //split paragraphs on return
 		pgptr->open(parent -> getfontref());
 	append(pgptr);
 	deletelines();
+	needs_layout = True;
 }
 
 void MCParagraph::deletestring(uint2 si, uint2 ei)
@@ -1630,6 +1648,7 @@ void MCParagraph::deletestring(uint2 si, uint2 ei)
 	clearzeros();
 
 	state |= PS_LINES_NOT_SYNCHED;
+	needs_layout = True;
 }
 
 MCParagraph *MCParagraph::copystring(uint2 si, uint2 ei)
@@ -1791,6 +1810,7 @@ void MCParagraph::finsertnobreak(const MCString& p_text, bool p_is_unicode)
 	}
 
 	delete t_native_text;
+	needs_layout = True;
 }
 
 // MW-2012-02-13: [[ Block Unicode ]] New implementation of finsert which understands unicodeness.
